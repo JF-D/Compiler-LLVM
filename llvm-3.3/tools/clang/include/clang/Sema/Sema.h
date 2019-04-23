@@ -254,6 +254,9 @@ public:
   /// of 0 indicates default alignment.
   void *PackContext; // Really a "PragmaPackStack*"
 
+	/// IsElementWise - status for ElementWise
+	bool IsElementWise;
+
   bool MSStructPragmaOn; // True when \#pragma ms_struct on
 
   /// VisContext - Manages the stack for \#pragma GCC visibility.
@@ -6578,6 +6581,14 @@ public:
     PPK_Push,    // #pragma pack(push, [identifier], [n])
     PPK_Pop      // #pragma pack(pop, [identifier], [n])
   };
+
+	enum PragmaElementWiseKind {
+		EWise_OFF, // #pragma elementWise
+    EWise_ON
+  };
+
+	/// ActOnPragmaElementWise - Called on well formed \#pragma elementWise
+	void ActOnPragmaElementWise(PragmaElementWiseKind Kind);
 
   enum PragmaMSStructKind {
     PMSST_OFF,  // #pragms ms_struct off

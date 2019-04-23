@@ -52,8 +52,8 @@ public:
                             Token &FirstToken);
 };
 
-class PragmaelementWiseHandler : public PragmaHandler {
-  explicit PragmaelementWiseHandler() : PragmaHandler("elementWise") {}
+class PragmaElementWiseHandler : public PragmaHandler {
+  explicit PragmaElementWiseHandler() : PragmaHandler("elementWise") {}
 
   virtual void HandlePragma(Preprocessor &PP, PragmaIntroducerKind INtroducer,
                             Token &FirstToken);

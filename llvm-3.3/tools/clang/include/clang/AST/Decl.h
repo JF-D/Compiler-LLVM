@@ -1396,6 +1396,7 @@ private:
   // FIXME: This can be packed into the bitfields in Decl.
   // NOTE: VC++ treats enums as signed, avoid using the StorageClass enum
   unsigned SClass : 2;
+	bool IsElementWise : 1;
   bool IsInline : 1;
   bool IsInlineSpecified : 1;
   bool IsVirtualAsWritten : 1;
@@ -1613,7 +1614,10 @@ public:
     return Body || IsLateTemplateParsed;
   }
 
-  void setBody(Stmt *B);
+  void setIsElementWise(bool IsElementWise);
+	bool getIsElementWise() const {return IsElementWise;};
+
+	void setBody(Stmt *B);
   void setLazyBody(uint64_t Offset) { Body = Offset; }
 
   /// Whether this function is variadic.

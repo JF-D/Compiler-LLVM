@@ -415,6 +415,10 @@ private:
   /// #pragma pack...
   void HandlePragmaPack();
 
+	/// \brief Handle the annotation token produces for
+	/// #pragma elementWise
+	void HandlePragmaElementWise();
+
   /// \brief Handle the annotation token produced for
   /// #pragma ms_struct...
   void HandlePragmaMSStruct();

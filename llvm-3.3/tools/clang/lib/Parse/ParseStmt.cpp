@@ -269,7 +269,7 @@ Retry:
 
   case tok::annot_pragma_elementWise:
     ProhibitAttributes(Attrs);
-    HandlePragmaelementWise();
+    HandlePragmaelEmentWise();
     return StmtEmpty();
 
   case tok::annot_pragma_msstruct:

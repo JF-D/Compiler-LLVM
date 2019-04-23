@@ -62,11 +62,13 @@ void Parser::HandlePragmaPack() {
                           Info->LParenLoc, Info->RParenLoc);
 }
 
-void Parser::HandlePragmaelementWise() {
+void Parser::HandlePragmaElementWise() {
   assert(Tok.is(tok::annot_pragma_elementWise));
-  //TODO: student add code here 
-  Actions.ActOnPragmaPack(/*TODO: student add code here*/);
-  //TODO: student add code here maybe
+  Sema::PragmaElementWiseKind Kind = 
+	static_cast<Sema::PragmaElementWiseKind>(
+  reinterpret_cast<uintptr_t>(Tok.getAnnotationValue()));
+  Actions.ActOnPragmaElementWise(Kind);
+  ConsumeToken();
 }
 
 void Parser::HandlePragmaMSStruct() {
@@ -366,10 +368,31 @@ void PragmaPackHandler::HandlePragma(Preprocessor &PP,
 }
 
 // #pragma elementWise
-void PragmaelementWiseHandler::HandlePragma(Preprocessor &PP, 
+void PragmaElementWiseHandler::HandlePragma(Preprocessor &PP, 
                                      PragmaIntroducerKind Introducer,
                                      Token &elementWiseTok) {
   //TODO:student coding here
+	Sema::PragmaElementWiseKind Kind = Sema::EWise_OFF;
+	
+  Token Tok;
+	PP.Lex(Tok);
+	if (Tok.isNot(tok::eod)) {
+		PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol) << "elementWise";
+		return ;
+	}
+
+  Sema::PragmaElementWiseKind Kind = Sema::EWise_ON;
+	Token *Toks = (Token *) PP.getPreprocessorAllocator().Allocate(
+													sizeof(Token) * 1, llvm::alignOf<Token>());
+	new (Toks) Token();
+	Toks[0].startToken();
+	Toks[0].setKind(tok::annot_pragma_elementWise);
+	Toks[0].setLocation(Tok.getLocation());
+	Toks[0].setAnnotationValue(reinterpret_cast<void*>(
+                             static_cast<uintptr_t>(Kind)));
+	PP.EnterTokenStream(Toks, 1, /*DisableMacroExpansion=*/true,
+											/*OwnTokens=*/false);
+
 }
  
 // #pragma ms_struct on

@@ -8880,7 +8880,8 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
 
   if (FD) {
     FD->setBody(Body);
-
+    FD->setIsElementWise(IsElementWise);
+    IsElementWise = 0 ;
     if (getLangOpts().CPlusPlus1y && !FD->isInvalidDecl() &&
         !FD->isDependentContext()) {
       if (FD->getResultType()->isUndeducedType()) {
@@ -8934,7 +8935,7 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
           !FD->isDependentContext())
         computeNRVO(Body, getCurFunction());
     }
-    
+
     assert((FD == getCurFunctionDecl() || getCurLambda()->CallOperator == FD) &&
            "Function parsing confused");
   } else if (ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>(dcl)) {

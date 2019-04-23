@@ -259,8 +259,8 @@ void Sema::ActOnPragmaPack(PragmaPackKind Kind, IdentifierInfo *Name,
   }
 }
 
-void Sema::ActOnPragmaelementWise(/*TODO: student add code here */) {
-  //TODO: student add code here
+void Sema::ActOnPragmaelementWise(PragmaElementWiseKind Kind) {
+  IsElementWise = (Kind == EWise_ON);
 }
 
 void Sema::ActOnPragmaMSStruct(PragmaMSStructKind Kind) { 
