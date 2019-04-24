@@ -53,6 +53,7 @@ public:
 };
 
 class PragmaElementWiseHandler : public PragmaHandler {
+public:
   explicit PragmaElementWiseHandler() : PragmaHandler("elementWise") {}
 
   virtual void HandlePragma(Preprocessor &PP, PragmaIntroducerKind INtroducer,

@@ -1492,7 +1492,7 @@ protected:
                      StartLoc),
       DeclContext(DK),
       ParamInfo(0), Body(),
-      SClass(S),
+      SClass(S), IsElementWise(0),
       IsInline(isInlineSpecified), IsInlineSpecified(isInlineSpecified),
       IsVirtualAsWritten(false), IsPure(false), HasInheritedPrototype(false),
       HasWrittenPrototype(true), IsDeleted(false), IsTrivial(false),

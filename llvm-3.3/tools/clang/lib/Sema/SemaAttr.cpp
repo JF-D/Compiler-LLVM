@@ -259,7 +259,7 @@ void Sema::ActOnPragmaPack(PragmaPackKind Kind, IdentifierInfo *Name,
   }
 }
 
-void Sema::ActOnPragmaelementWise(PragmaElementWiseKind Kind) {
+void Sema::ActOnPragmaElementWise(PragmaElementWiseKind Kind) {
   IsElementWise = (Kind == EWise_ON);
 }
 

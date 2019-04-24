@@ -381,13 +381,13 @@ void PragmaElementWiseHandler::HandlePragma(Preprocessor &PP,
 		return ;
 	}
 
-  Sema::PragmaElementWiseKind Kind = Sema::EWise_ON;
+  Kind = Sema::EWise_ON;
 	Token *Toks = (Token *) PP.getPreprocessorAllocator().Allocate(
 													sizeof(Token) * 1, llvm::alignOf<Token>());
 	new (Toks) Token();
 	Toks[0].startToken();
 	Toks[0].setKind(tok::annot_pragma_elementWise);
-	Toks[0].setLocation(Tok.getLocation());
+	Toks[0].setLocation(elementWiseTok.getLocation());
 	Toks[0].setAnnotationValue(reinterpret_cast<void*>(
                              static_cast<uintptr_t>(Kind)));
 	PP.EnterTokenStream(Toks, 1, /*DisableMacroExpansion=*/true,
