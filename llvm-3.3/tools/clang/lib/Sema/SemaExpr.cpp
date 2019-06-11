@@ -6471,6 +6471,38 @@ QualType Sema::CheckMultiplyDivideOperands(ExprResult &LHS, ExprResult &RHS,
       RHS.get()->getType()->isVectorType())
     return CheckVectorOperands(LHS, RHS, Loc, IsCompAssign);
 
+  //handle the case: unqualified array '*'
+  if(!IsDiv && !IsCompAssign && this->IsElementWise &&
+    LHS.get()->getType().getTypePtr()->isConstantArrayType() &&
+    RHS.get()->getType().getTypePtr()->isConstantArrayType() )
+  {
+    const ConstantArrayType *lhs = dyn_cast<ConstantArrayType>(LHS.get()->getType().getTypePtr());
+    const ConstantArrayType *rhs = dyn_cast<ConstantArrayType>(RHS.get()->getType().getTypePtr());
+    QualType lhs_dt = lhs->getElementType().getUnqualifiedType();
+    QualType rhs_dt = rhs->getElementType().getUnqualifiedType();
+    if(lhs->getSize() == rhs->getSize() && lhs_dt == rhs_dt &&
+      lhs_dt.getTypePtr()->isIntegerType())
+    {
+      if(!(LHS.get()->isRValue()))
+      {
+        Qualifiers tmp;
+        ImplicitCastExpr *lhs_l2r = ImplicitCastExpr::Create(Context, 
+          Context.getUnqualifiedArrayType(LHS.get()->getType().getUnqualifiedType(), tmp),
+          CK_LValueToRValue, LHS.get(), 0, VK_RValue);
+        LHS = lhs_l2r;
+      }
+      if(!(RHS.get()->isRValue()))
+      {
+        Qualifiers tmp;
+        ImplicitCastExpr *rhs_l2r = ImplicitCastExpr::Create(Context, 
+          Context.getUnqualifiedArrayType(RHS.get()->getType().getUnqualifiedType(), tmp),
+          CK_LValueToRValue, RHS.get(), 0, VK_RValue);
+        RHS = rhs_l2r;
+      }
+      return LHS.get()->getType();
+    }
+  }
+
   QualType compType = UsualArithmeticConversions(LHS, RHS, IsCompAssign);
   if (LHS.isInvalid() || RHS.isInvalid())
     return QualType();
@@ -6713,6 +6745,37 @@ QualType Sema::CheckAdditionOperands( // C99 6.5.6
     QualType compType = CheckVectorOperands(LHS, RHS, Loc, CompLHSTy);
     if (CompLHSTy) *CompLHSTy = compType;
     return compType;
+  }
+
+  //handle the case: unqualified array '+'
+  if(this->IsElementWise && LHS.get()->getType().getTypePtr()->isConstantArrayType() &&
+    RHS.get()->getType().getTypePtr()->isConstantArrayType())
+  {
+    const ConstantArrayType *lhs = dyn_cast<ConstantArrayType>(LHS.get()->getType().getTypePtr());
+    const ConstantArrayType *rhs = dyn_cast<ConstantArrayType>(RHS.get()->getType().getTypePtr());
+    QualType lhs_dt = lhs->getElementType().getUnqualifiedType();
+    QualType rhs_dt = rhs->getElementType().getUnqualifiedType();
+    if(lhs->getSize() == rhs->getSize() && lhs_dt == rhs_dt &&
+      lhs_dt.getTypePtr()->isIntegerType())
+    {
+      if(!(LHS.get()->isRValue()))
+      {
+        Qualifiers tmp;
+        ImplicitCastExpr *lhs_l2r = ImplicitCastExpr::Create(Context, 
+          Context.getUnqualifiedArrayType(LHS.get()->getType().getUnqualifiedType(), tmp),
+          CK_LValueToRValue, LHS.get(), 0, VK_RValue);
+        LHS = lhs_l2r;
+      }
+      if(!(RHS.get()->isRValue()))
+      {
+        Qualifiers tmp;
+        ImplicitCastExpr *rhs_l2r = ImplicitCastExpr::Create(Context, 
+          Context.getUnqualifiedArrayType(RHS.get()->getType().getUnqualifiedType(), tmp),
+          CK_LValueToRValue, RHS.get(), 0, VK_RValue);
+        RHS = rhs_l2r;
+      }
+      return LHS.get()->getType();
+    }
   }
 
   QualType compType = UsualArithmeticConversions(LHS, RHS, CompLHSTy);
@@ -7877,6 +7940,9 @@ static bool CheckForModifiableLvalue(Expr *E, SourceLocation Loc, Sema &S) {
     IsLV = Expr::MLV_InvalidMessageExpression;
   if (IsLV == Expr::MLV_Valid)
     return false;
+  if(IsLV == Expr::MLV_ArrayType && S.IsElementWise &&
+    ConstantArrayType::classof(E->getType().getTypePtr()))
+    return false;
 
   unsigned Diag = 0;
   bool NeedType = false;
@@ -8053,6 +8119,31 @@ QualType Sema::CheckAssignmentOperands(Expr *LHSExpr, ExprResult &RHS,
         Diag(Loc, diag::warn_not_compound_assign)
           << (UO->getOpcode() == UO_Plus ? "+" : "-")
           << SourceRange(UO->getOperatorLoc(), UO->getOperatorLoc());
+      }
+    }
+
+    //handle the case: unqualified array '='
+    if(this->IsElementWise && RHSType.getTypePtr()->isConstantArrayType())
+    {
+      const ConstantArrayType *lhs = dyn_cast<ConstantArrayType>(LHSType.getTypePtr());
+      const ConstantArrayType *rhs = dyn_cast<ConstantArrayType>(RHSType.getTypePtr());
+      QualType lhs_dt = lhs->getElementType().getUnqualifiedType();
+      QualType rhs_dt = rhs->getElementType().getUnqualifiedType();
+      if(lhs->getSize() == rhs->getSize() && lhs_dt == rhs_dt &&
+        lhs_dt.getTypePtr()->isIntegerType())
+      {
+        if(LHSExpr->isLValue())
+        {
+          if(!(RHSCheck->isRValue()))
+          {
+            Qualifiers tmp;
+            ImplicitCastExpr *rhs_l2r = ImplicitCastExpr::Create(Context, 
+              Context.getUnqualifiedArrayType(RHSType.getUnqualifiedType(), tmp),
+              CK_LValueToRValue, RHSCheck, 0, VK_RValue);
+            RHS = rhs_l2r;
+          }
+          return RHS.get()->getType();
+        }
       }
     }
 
