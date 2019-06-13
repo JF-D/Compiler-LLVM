@@ -8142,7 +8142,7 @@ QualType Sema::CheckAssignmentOperands(Expr *LHSExpr, ExprResult &RHS,
               CK_LValueToRValue, RHSCheck, 0, VK_RValue);
             RHS = rhs_l2r;
           }
-          return RHS.get()->getType();
+          return LHSType;
         }
       }
     }
