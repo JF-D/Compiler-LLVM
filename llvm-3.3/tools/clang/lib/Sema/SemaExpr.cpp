@@ -6481,7 +6481,7 @@ QualType Sema::CheckMultiplyDivideOperands(ExprResult &LHS, ExprResult &RHS,
     QualType lhs_dt = lhs->getElementType().getUnqualifiedType();
     QualType rhs_dt = rhs->getElementType().getUnqualifiedType();
     if(lhs->getSize() == rhs->getSize() && lhs_dt == rhs_dt &&
-      lhs_dt.getTypePtr()->isIntegerType())
+      lhs_dt.getTypePtr()->isIntType())
     {
       if(!(LHS.get()->isRValue()))
       {
@@ -6756,7 +6756,7 @@ QualType Sema::CheckAdditionOperands( // C99 6.5.6
     QualType lhs_dt = lhs->getElementType().getUnqualifiedType();
     QualType rhs_dt = rhs->getElementType().getUnqualifiedType();
     if(lhs->getSize() == rhs->getSize() && lhs_dt == rhs_dt &&
-      lhs_dt.getTypePtr()->isIntegerType())
+      lhs_dt.getTypePtr()->isIntType())
     {
       if(!(LHS.get()->isRValue()))
       {
@@ -8084,6 +8084,31 @@ QualType Sema::CheckAssignmentOperands(Expr *LHSExpr, ExprResult &RHS,
 
     CheckIdentityFieldAssignment(LHSExpr, RHSCheck, Loc, *this);
 
+    //handle the case: unqualified array '='
+    if(this->IsElementWise && RHSType.getTypePtr()->isConstantArrayType())
+    {
+      const ConstantArrayType *lhs = dyn_cast<ConstantArrayType>(LHSType.getTypePtr());
+      const ConstantArrayType *rhs = dyn_cast<ConstantArrayType>(RHSType.getTypePtr());
+      QualType lhs_dt = lhs->getElementType().getUnqualifiedType();
+      QualType rhs_dt = rhs->getElementType().getUnqualifiedType();
+      if(lhs->getSize() == rhs->getSize() && lhs_dt == rhs_dt &&
+        lhs_dt.getTypePtr()->isIntType())
+      {
+        if(LHSExpr->isLValue())
+        {
+          if(!(RHSCheck->isRValue()))
+          {
+            Qualifiers tmp;
+            ImplicitCastExpr *rhs_l2r = ImplicitCastExpr::Create(Context, 
+              Context.getUnqualifiedArrayType(RHSType.getUnqualifiedType(), tmp),
+              CK_LValueToRValue, RHSCheck, 0, VK_RValue);
+            RHS = rhs_l2r;
+          }
+          return LHSType;
+        }
+      }
+    }
+
     QualType LHSTy(LHSType);
     ConvTy = CheckSingleAssignmentConstraints(LHSTy, RHS);
     if (RHS.isInvalid())
@@ -8119,31 +8144,6 @@ QualType Sema::CheckAssignmentOperands(Expr *LHSExpr, ExprResult &RHS,
         Diag(Loc, diag::warn_not_compound_assign)
           << (UO->getOpcode() == UO_Plus ? "+" : "-")
           << SourceRange(UO->getOperatorLoc(), UO->getOperatorLoc());
-      }
-    }
-
-    //handle the case: unqualified array '='
-    if(this->IsElementWise && RHSType.getTypePtr()->isConstantArrayType())
-    {
-      const ConstantArrayType *lhs = dyn_cast<ConstantArrayType>(LHSType.getTypePtr());
-      const ConstantArrayType *rhs = dyn_cast<ConstantArrayType>(RHSType.getTypePtr());
-      QualType lhs_dt = lhs->getElementType().getUnqualifiedType();
-      QualType rhs_dt = rhs->getElementType().getUnqualifiedType();
-      if(lhs->getSize() == rhs->getSize() && lhs_dt == rhs_dt &&
-        lhs_dt.getTypePtr()->isIntegerType())
-      {
-        if(LHSExpr->isLValue())
-        {
-          if(!(RHSCheck->isRValue()))
-          {
-            Qualifiers tmp;
-            ImplicitCastExpr *rhs_l2r = ImplicitCastExpr::Create(Context, 
-              Context.getUnqualifiedArrayType(RHSType.getUnqualifiedType(), tmp),
-              CK_LValueToRValue, RHSCheck, 0, VK_RValue);
-            RHS = rhs_l2r;
-          }
-          return LHSType;
-        }
       }
     }
 
