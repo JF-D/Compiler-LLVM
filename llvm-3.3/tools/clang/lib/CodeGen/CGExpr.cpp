@@ -114,6 +114,159 @@ void CodeGenFunction::EmitIgnoredExpr(const Expr *E) {
 RValue CodeGenFunction::EmitAnyExpr(const Expr *E,
                                     AggValueSlot aggSlot,
                                     bool ignoreResult) {
+  //deal with #elementWise operation(+/*/=)
+  if(E->getType()->getTypeClass() == Type::ConstantArray)
+  {
+    if(BinaryOperator::classof(E))
+    {
+        QualType Ty = getContext().IntTy;
+        llvm::Type *LTy = ConvertTypeForMem(Ty);
+
+        llvm::AllocaInst *Alloca = CreateTempAlloca(LTy);
+        Alloca->setName("i");
+        Alloca->setAlignment(4);
+
+        llvm::StoreInst *Store = Builder.CreateStore(llvm::ConstantInt::get(LTy, llvm::APInt(32,0)), (llvm::Value*)Alloca, false);
+        Store->setAlignment(4);
+
+        const BinaryOperator *bo = dyn_cast<BinaryOperator>(E);
+        assert(bo->getOpcode() == BO_Assign);
+
+        Expr *lhs = bo->getLHS();
+        Expr *rhs = bo->getRHS();
+
+        assert(lhs->getType()->getTypeClass() == Type::ConstantArray);
+        assert(DeclRefExpr::classof(lhs));
+
+        const Type* lhs_T = lhs->getType().getTypePtr();
+        const ConstantArrayType *lhs_type = dyn_cast<ConstantArrayType>(lhs_T);
+        const llvm::APInt lhs_size = lhs_type->getSize();
+
+        llvm::Value *baseA, *addrA ,*baseB, *addrB, *baseC, *addrC;
+
+        llvm::BasicBlock *ForCond = createBasicBlock("for.cond");
+        llvm::BasicBlock *ForBody = createBasicBlock("for.body");
+        llvm::BasicBlock *ForInc = createBasicBlock("for.inc");
+        llvm::BasicBlock *ForEnd = createBasicBlock("for.end");
+
+        EmitBlock(ForCond);
+        llvm::LoadInst *index = Builder.CreateLoad((llvm::Value*)Alloca, "");
+        index->setAlignment(4);
+        llvm::Value *index_promoted = Builder.CreateIntCast(index, IntPtrTy, false, "index");
+        QualType cmp_Ty = getContext().UnsignedLongTy;
+        llvm::Type *cmp_LTy = ConvertType(cmp_Ty); 
+        llvm::Value *cmp = Builder.CreateICmpSLT(index_promoted, llvm::ConstantInt::get(cmp_LTy, lhs_size));
+        Builder.CreateCondBr(cmp, ForBody, ForEnd);
+
+        EmitBlock(ForBody);
+        if(BinaryOperator::classof(rhs))
+        {
+          const BinaryOperator *bo1 = dyn_cast<BinaryOperator>(rhs);
+          Expr *lhs1 = bo1->getLHS();
+          Expr *rhs1 = bo1->getRHS();
+          assert(lhs1->getType()->getTypeClass() == Type::ConstantArray);
+          assert(rhs1->getType()->getTypeClass() == Type::ConstantArray);
+          if(bo1->getOpcode() == BO_Add || bo1->getOpcode() == BO_Mul)
+          {
+            const DeclRefExpr *declRef =  dyn_cast<DeclRefExpr>(lhs);
+            const ValueDecl* decl = declRef->getDecl();
+            baseC = LocalDeclMap.lookup((Decl*)decl);
+            assert(ImplicitCastExpr::classof(lhs1));
+            assert(ImplicitCastExpr::classof(rhs1));
+            const ImplicitCastExpr* lhs2 = dyn_cast<ImplicitCastExpr>(lhs1);
+            const ImplicitCastExpr* rhs2 = dyn_cast<ImplicitCastExpr>(rhs1);
+
+            const DeclRefExpr *declRefR1 = dyn_cast<DeclRefExpr>(lhs2->getSubExpr());
+            const ValueDecl* declr1 = declRefR1 ->getDecl();
+            baseA = LocalDeclMap.lookup((Decl*)declr1);
+
+            const DeclRefExpr *declRefR2 = dyn_cast<DeclRefExpr>(rhs2->getSubExpr());
+            const ValueDecl* declr2 = declRefR2->getDecl();
+            baseB = LocalDeclMap.lookup((Decl*)declr2);
+
+            CharUnits Alignment = getContext().getDeclAlign(declr2);
+
+            QualType T = declRefR2->getType();
+
+            LValue LVA, LVB, LVC;
+
+            LVA = MakeAddrLValue(baseA, T, Alignment);
+            LVB = MakeAddrLValue(baseB, T, Alignment);
+            LVC = MakeAddrLValue(baseC, T, Alignment);
+
+            llvm::Value *arrayPtrA = LVA.getAddress();
+            llvm::Value *arrayPtrB = LVB.getAddress();
+            llvm::Value *arrayPtrC = LVC.getAddress();
+            llvm::Value *Zero = llvm::ConstantInt::get(Int32Ty, 0);
+
+            llvm::Value *args[] = {Zero, index_promoted};
+
+            addrA = Builder.CreateInBoundsGEP(arrayPtrA, args, "arrayindex");
+            addrB = Builder.CreateInBoundsGEP(arrayPtrB, args, "arrayindex");
+            addrC = Builder.CreateInBoundsGEP(arrayPtrC, args, "arrayindex");
+
+            llvm::LoadInst *valueA = Builder.CreateLoad(addrA, "");
+            llvm::LoadInst *valueB = Builder.CreateLoad(addrB, "");
+            valueA->setAlignment(4);
+            valueB->setAlignment(4);
+
+            if(bo1->getOpcode() == BO_Add)
+            {
+              llvm::Value *add = Builder.CreateAdd((llvm::Value *)valueA, (llvm::Value *)valueB, "add");
+              llvm::StoreInst *valueC = Builder.CreateStore(add, addrC, false);
+              valueC->setAlignment(4);
+            }
+            else
+            {
+              llvm::Value *add = Builder.CreateMul((llvm::Value *)valueA, (llvm::Value *)valueB, "mul");
+              llvm::StoreInst *valueC = Builder.CreateStore(add, addrC, false);
+              valueC->setAlignment(4);
+            }
+          }
+        }
+        else 
+        {  
+          assert(rhs->getType()->getTypeClass() == Type::ConstantArray);
+          assert(DeclRefExpr::classof(rhs));
+          const DeclRefExpr *declRef =  dyn_cast<DeclRefExpr>(lhs);
+          const ValueDecl* decl = declRef->getDecl();
+          baseC = LocalDeclMap.lookup((Decl*)decl);
+
+          const DeclRefExpr *declRefr = dyn_cast<DeclRefExpr>(rhs);
+          const ValueDecl* declr = declRefr->getDecl();
+          baseA = LocalDeclMap.lookup((Decl*)declr);
+          CharUnits Alignment = getContext().getDeclAlign(decl);
+          QualType T = declRef->getType();
+          LValue LVA, LVC;
+
+          LVA = MakeAddrLValue(baseA ,T ,Alignment);
+          LVC = MakeAddrLValue(baseC ,T ,Alignment);
+
+          llvm::Value *arrayPtrA = LVA.getAddress();
+          llvm::Value *arrayPtrC = LVC.getAddress();
+          llvm::Value *Zero = llvm::ConstantInt::get(Int32Ty, 0);
+
+          llvm::Value *args[] = {Zero, index_promoted};
+
+          addrA = Builder.CreateInBoundsGEP(arrayPtrA, args, "arrayindex");
+          addrC = Builder.CreateInBoundsGEP(arrayPtrC, args, "arrayindex");
+
+          llvm::LoadInst *valueA = Builder.CreateLoad(addrA, "");
+          valueA->setAlignment(4);
+          llvm::StoreInst *valueC = Builder.CreateStore((llvm::Value *)valueA, addrC, false);
+          valueC->setAlignment(4);
+        }
+        EmitBlock(ForInc);
+        llvm::Value *inc_index = Builder.CreateAdd((llvm::Value*)index, (llvm::Value*)llvm::ConstantInt::get(LTy,llvm::APInt(32,1)), "add");
+        llvm::StoreInst * inc_store = Builder.CreateStore(inc_index, (llvm::Value*)Alloca, false);
+        inc_store->setAlignment(4);
+        Builder.CreateBr(ForCond);
+
+        EmitBlock(ForEnd);
+        return RValue::get(addrA);
+        //llvm::LoadInst *idx = B
+    }
+  }
   switch (getEvaluationKind(E->getType())) {
   case TEK_Scalar:
     return RValue::get(EmitScalarExpr(E, ignoreResult));
