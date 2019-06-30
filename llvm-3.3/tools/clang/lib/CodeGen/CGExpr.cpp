@@ -227,20 +227,22 @@ RValue CodeGenFunction::EmitAnyExpr(const Expr *E,
         else 
         {  
           assert(rhs->getType()->getTypeClass() == Type::ConstantArray);
-          assert(DeclRefExpr::classof(rhs));
-          const DeclRefExpr *declRef =  dyn_cast<DeclRefExpr>(lhs);
+          assert(ImplicitCastExpr::classof(rhs));
+          const DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(lhs);
           const ValueDecl* decl = declRef->getDecl();
           baseC = LocalDeclMap.lookup((Decl*)decl);
 
-          const DeclRefExpr *declRefr = dyn_cast<DeclRefExpr>(rhs);
+          const ImplicitCastExpr* rhs1 = dyn_cast<ImplicitCastExpr>(rhs);
+          const DeclRefExpr *declRefr = dyn_cast<DeclRefExpr>(rhs1->getSubExpr());
           const ValueDecl* declr = declRefr->getDecl();
           baseA = LocalDeclMap.lookup((Decl*)declr);
+
           CharUnits Alignment = getContext().getDeclAlign(decl);
           QualType T = declRef->getType();
           LValue LVA, LVC;
 
-          LVA = MakeAddrLValue(baseA ,T ,Alignment);
-          LVC = MakeAddrLValue(baseC ,T ,Alignment);
+          LVA = MakeAddrLValue(baseA, T, Alignment);
+          LVC = MakeAddrLValue(baseC, T, Alignment);
 
           llvm::Value *arrayPtrA = LVA.getAddress();
           llvm::Value *arrayPtrC = LVC.getAddress();
